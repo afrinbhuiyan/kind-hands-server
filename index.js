@@ -11,7 +11,8 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cb9e028.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri =
+  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cb9e028.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -25,6 +26,23 @@ async function run() {
   try {
     await client.connect();
 
+    const database = client.db("volunteerDB");
+        const postsCollection = database.collection('volunteerPosts');
+
+        // 📌 Add Volunteer Post
+        app.post('/posts', async (req, res) => {
+          const postData = req.body;
+          const result = await postsCollection.insertOne(postData);
+          res.send(result);
+        });
+
+        // 📌 Get all posts (sorted by deadline ascending)
+        app.get('/posts', async (req, res) => {
+          const result = await postsCollection.find()
+            .sort({ deadline: 1 }) // ascending order
+            .toArray();
+          res.send(result);
+        });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
