@@ -11,8 +11,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const uri =
-  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cb9e028.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cb9e028.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -27,38 +26,72 @@ async function run() {
     await client.connect();
 
     const database = client.db("volunteerDB");
-        const postsCollection = database.collection('volunteerPosts');
+    const postsCollection = database.collection("volunteerPosts");
+    const volunteerRequestsCollection =
+      database.collection("volunteerRequests");
 
-        // 📌 Add Volunteer Post
-        app.post('/posts', async (req, res) => {
-          const postData = req.body;
-          const result = await postsCollection.insertOne(postData);
-          res.send(result);
-        });
+    // 📌 Add Volunteer Post
+    app.post("/posts", async (req, res) => {
+      const postData = req.body;
+      const result = await postsCollection.insertOne(postData);
+      res.send(result);
+    });
 
-        // 📌 Get all posts (sorted by deadline ascending)
-        app.get('/posts', async (req, res) => {
-          const result = await postsCollection.find()
-            .sort({ deadline: 1 }) // ascending order
-            .toArray();
-          res.send(result);
-        });
+    // 📌 Get all posts (sorted by deadline ascending)
+    app.get("/posts", async (req, res) => {
+      const result = await postsCollection
+        .find()
+        .sort({ deadline: 1 }) // ascending order
+        .toArray();
+      res.send(result);
+    });
 
-        // 📌 Get first 6 posts for home page
-        app.get('/posts/home', async (req, res) => {
-          const result = await postsCollection.find()
-            .sort({ deadline: 1 })
-            .limit(6)
-            .toArray();
-          res.send(result);
-        });
+    // 📌 Get first 6 posts for home page
+    app.get("/posts/home", async (req, res) => {
+      const result = await postsCollection
+        .find()
+        .sort({ deadline: 1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
 
-        // 📌 Get single post by ID
-        app.get('/posts/:id', async (req, res) => {
-          const id = req.params.id;
-          const post = await postsCollection.findOne({ _id: new ObjectId(id) });
-          res.send(post);
-        });
+    // 📌 Get single post by ID
+    app.get("/posts/:id", async (req, res) => {
+      const id = req.params.id;
+      const post = await postsCollection.findOne({ _id: new ObjectId(id) });
+      res.send(post);
+    });
+
+    app.post("/volunteer-requests", async (req, res) => {
+      const request = req.body;
+
+      if (!request.postId) {
+        return res.status(400).send({ message: "postId is required." });
+      }
+      
+      const postId = new ObjectId(request.postId);
+      const post = await postsCollection.findOne({ _id: postId });
+
+      if (!post) {
+        return res.status(404).send({ message: "Post not found." });
+      }
+
+      if (post.volunteersNeeded <= 0) {
+        return res.status(400).send({ message: "No volunteers needed." });
+      }
+
+      // Insert volunteer request
+      const result = await volunteerRequestsCollection.insertOne(request);
+
+      // Decrease volunteersNeeded by 1
+      await postsCollection.updateOne(
+        { _id: postId },
+        { $inc: { volunteersNeeded: -1 } }
+      );
+
+      res.send(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
