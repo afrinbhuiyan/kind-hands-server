@@ -69,7 +69,7 @@ async function run() {
       if (!request.postId) {
         return res.status(400).send({ message: "postId is required." });
       }
-      
+
       const postId = new ObjectId(request.postId);
       const post = await postsCollection.findOne({ _id: postId });
 
@@ -90,6 +90,28 @@ async function run() {
         { $inc: { volunteersNeeded: -1 } }
       );
 
+      res.send(result);
+    });
+
+    app.get("/my-posts", async (req, res) => {
+      const email = req.query.email;
+      const result = await postsCollection
+        .find({ organizerEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/my-volunteer-requests", async (req, res) => {
+      const email = req.query.email;
+      const result = await volunteerRequestsCollection
+        .find({ volunteerEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    app.delete("/my-posts/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await postsCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
