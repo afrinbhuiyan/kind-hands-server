@@ -46,6 +46,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/posts/search", async (req, res) => {
+      const searchTerm = req.query.title;
+      const query = { title: { $regex: searchTerm, $options: "i" } };
+      const result = await postsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // 📌 Get first 6 posts for home page
     app.get("/posts/home", async (req, res) => {
       const result = await postsCollection
@@ -63,32 +70,28 @@ async function run() {
       res.send(post);
     });
 
-    app.post("/volunteer-requests", async (req, res) => {
-      const request = req.body;
+    app.post("/volunteer_requests", async (req, res) => {
+      const requestData = req.body;
+      const result = await volunteerRequestsCollection.insertOne(requestData);
+      res.send(result);
+    });
 
-      if (!request.postId) {
-        return res.status(400).send({ message: "postId is required." });
+    app.get("/volunteer_requests", async (req, res) => {
+      const email = req.body.email;
+
+      const query = {
+        volunteerEmail: email,
+      };
+      const result = await volunteerRequestsCollection.find(query).toArray();
+
+      for (const volunteer_requests of result) {
+        const requestId = volunteer_requests.postId;
+        const requestQuery = { _id: new ObjectId(requestId) };
+        const request = await postsCollection.findOne(requestQuery);
+        volunteer_requests.title = request.title;
+        volunteer_requests.category = request.category;
+        volunteer_requests.deadline = request.deadline;
       }
-
-      const postId = new ObjectId(request.postId);
-      const post = await postsCollection.findOne({ _id: postId });
-
-      if (!post) {
-        return res.status(404).send({ message: "Post not found." });
-      }
-
-      if (post.volunteersNeeded <= 0) {
-        return res.status(400).send({ message: "No volunteers needed." });
-      }
-
-      // Insert volunteer request
-      const result = await volunteerRequestsCollection.insertOne(request);
-
-      // Decrease volunteersNeeded by 1
-      await postsCollection.updateOne(
-        { _id: postId },
-        { $inc: { volunteersNeeded: -1 } }
-      );
 
       res.send(result);
     });
@@ -106,6 +109,25 @@ async function run() {
       const result = await volunteerRequestsCollection
         .find({ volunteerEmail: email })
         .toArray();
+      res.send(result);
+    });
+
+    // Delete a volunteer request
+    app.delete("/volunteer-requests/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await volunteerRequestsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    app.put("/my-posts/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedTask = req.body;
+      const result = await postsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedTask }
+      );
       res.send(result);
     });
 
